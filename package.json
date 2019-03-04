@@ -1,27 +1,18 @@
 {
-  "name": "ofisim-ik-reporter-bot",
+  "name": "ofisim-ik-bot",
   "version": "1.0.0",
-  "description": "ik.ofisim.com'da bulunan zaman çizelgesini hergün doldurup, haftasonu onaya gönderen bot",
   "main": "app.js",
-  "author": "Semih Onay",
   "license": "MIT",
-  "private": false,
-  "engines": {
-    "node": ">=10.15.1"
-  },
-  "keywords": [
-    "bot",
-    "ik.ofisim.com",
-    "timesheeet",
-    "timetracker"
-  ],
   "dependencies": {
-    "@types/node": "^11.9.5",
+    "typescript": "^3.3.3333",
     "dotenv": "^6.2.0",
-    "request": "2.88.0"
+    "request": "^2.88.0",
+    "request-promise": "^4.2.4"
   },
   "devDependencies": {
-    "typescript": "^3.3.3333",
-    "tslint": "^5.13.0"
+    "@types/dotenv": "^6.1.0",
+    "@types/node": "^11.10.4",
+    "@types/request": "^2.48.1",
+    "@types/request-promise": "^4.1.42"
   }
 }
