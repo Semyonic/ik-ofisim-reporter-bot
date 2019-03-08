@@ -1,18 +1,40 @@
 {
   "name": "ofisim-ik-bot",
   "version": "1.0.0",
+  "author": {
+    "name": "Semih Onay",
+    "email": "semih.onay@bilgiedu.net",
+    "url": "https://semihonay.tk"
+  },
+  "description": "A bot that sends daily reports to ik.ofisim.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/flaviocopes/testing.git"
+  },
+  "keywords": [
+    "bot",
+    "time-sheet-bot",
+    "automation"
+  ],
   "main": "app.js",
   "license": "MIT",
+  "engines": {
+    "node": ">= 6.0.0"
+  },
   "dependencies": {
     "typescript": "^3.3.3333",
     "dotenv": "^6.2.0",
-    "request": "^2.88.0",
-    "request-promise": "^4.2.4"
+    "request": "^2.88.0"
   },
   "devDependencies": {
+    "mocha": "^6.0.2",
+    "chai": "^4.2.0",
     "@types/dotenv": "^6.1.0",
     "@types/node": "^11.10.4",
     "@types/request": "^2.48.1",
-    "@types/request-promise": "^4.1.42"
+    "@types/mocha": "^5.2.6",
+    "@types/chai": "^4.1.7",
+    "eslint": "^5.15.1",
+    "eslint-config-google": "^0.12.0"
   }
 }
