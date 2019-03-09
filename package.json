@@ -22,11 +22,11 @@
     "node": ">= 6.0.0"
   },
   "dependencies": {
-    "typescript": "^3.3.3333",
     "dotenv": "^6.2.0",
     "request": "^2.88.0"
   },
   "devDependencies": {
+    "typescript": "^3.3.3333",
     "mocha": "^6.0.2",
     "chai": "^4.2.0",
     "@types/dotenv": "^6.1.0",

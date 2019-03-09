@@ -2,7 +2,6 @@
 *.tmproj
 *.tmproject
 tmtags
-.DS_Store
 .AppleDouble
 .LSOverride
 Icon
@@ -31,8 +30,6 @@ pids
 *.seed
 *.pid.lock
 lib-cov
-coverage
-.nyc_output
 .grunt
 bower_components
 .lock-wscript
@@ -44,7 +41,6 @@ typings/
 .eslintcache
 .node_repl_history
 *.tgz
-.yarn-integrity
 .env
 .cache
 .next
@@ -63,24 +59,8 @@ typings/
 [._]sw[a-p]
 Session.vim
 .netrwhist
-*~
 tags
 [._]*.un~
-*.bak
-.idea/**/workspace.xml
-.idea/**/tasks.xml
-.idea/**/usage.statistics.xml
-.idea/**/dictionaries
-.idea/**/shelf
-.idea/**/dataSources/
-.idea/**/dataSources.ids
-.idea/**/dataSources.local.xml
-.idea/**/sqlDataSources.xml
-.idea/**/dynamic.xml
-.idea/**/uiDesigner.xml
-.idea/**/dbnavigator.xml
-.idea/**/gradle.xml
-.idea/**/libraries
 cmake-build-*/
 .idea/**/mongoSettings.xml
 *.iws
@@ -110,3 +90,4 @@ $RECYCLE.BIN/
 *.msm
 *.msp
 *.lnk
+/.idea/

@@ -1,5 +1,5 @@
-import dotnev = require("dotenv");
-import request = require("request");
+import dotnev = require('dotenv');
+import request = require('request');
 
 export module TimeSheetReporterBot {
 
@@ -50,22 +50,6 @@ export module TimeSheetReporterBot {
         deleted: boolean;
     }
 
-    export class ITimeTrackerCreateRequest {
-        owner: number;
-        tarih: Date;
-        izindir: boolean;
-        kayit_kitle?: number;
-        saat: number;
-        gorev: number;
-        proje: number;
-        aciklama: string;
-        shared_users?: number;
-        shared_user_groups?: number;
-        shared_users_edit?: number;
-        shared_user_groups_edit?: number;
-        related_timetracker: number;
-    }
-
     export interface ITimeTrackerListResponse {
         id: number,
         owner: number,
@@ -109,110 +93,6 @@ export module TimeSheetReporterBot {
         process_status_list: string
     }
 
-    export class TimeTrackerListRequest {
-
-        protected fields: string[];
-        private filters = [];
-        private limit;
-
-        constructor() {
-            this.fields = [
-                "owner",
-                "week",
-                "year",
-                "timetracker_id",
-                "created_by",
-                "created_at",
-                "updated_by",
-                "updated_at",
-                "custom_approver",
-                "date_range",
-                "toplam_saat",
-                "ay",
-                "month",
-                "custom_approver_2",
-                "calisan",
-                "tamamlanan_saat",
-                "tarih",
-                "tamamlandi",
-                "hafta_toplami",
-                "kalan",
-                "ilgili_ay",
-                "approver",
-                "process_date",
-                "approver_order",
-                "process_status_list"
-            ];
-            this.filters = [
-                {
-                    "field": "week",
-                    "operator": "equals",
-                    "value": 10,
-                    "no": 1
-                },
-                {
-                    "field": "year",
-                    "operator": "equals",
-                    "value": 2019,
-                    "no": 2
-                },
-                {
-                    "field": "month",
-                    "operator": "equals",
-                    "value": 3,
-                    "no": 3
-                },
-                {
-                    "field": "owner",
-                    "operator": "equals",
-                    "value": 9722,
-                    "no": 4
-                }
-            ];
-            this.limit = 1;
-        }
-    }
-
-    export class TimeTrackerCreateRequest {
-
-        private readonly owner: number;
-        private readonly tarih: string;
-        private readonly izindir: boolean;
-        private readonly kayit_kitle: number;
-        private readonly saat: number;
-        private readonly gorev: number;
-        private readonly proje: number;
-        private readonly aciklama: string;
-        private readonly shared_users: any;
-        private readonly shared_user_groups: any;
-        private readonly shared_users_edit: any;
-        private readonly shared_user_groups_edit: any;
-        private readonly related_timetracker: number;
-
-        constructor(
-            owner: number, tarih: string, izin: boolean,
-            kitle: number, saat: number, bolum: number,
-            proje: number, aciklama: string) {
-            this.owner = owner;
-            this.tarih = tarih;
-            this.izindir = izin;
-            this.kayit_kitle = kitle;
-            this.saat = saat;
-            this.gorev = bolum;
-            this.proje = proje;
-            this.aciklama = aciklama;
-            this.shared_users = null;
-            this.shared_user_groups = null;
-            this.shared_users_edit = null;
-            this.shared_user_groups_edit = null;
-            this.related_timetracker = null;
-        }
-
-        json() {
-            return JSON.stringify(this);
-        }
-    }
-
     /**
      * ofisim.ik üzerinde bulunan Zaman Çizelgesi alanına
      * yapılan konfigürasyon doğrultusunda raporları girer,
@@ -220,9 +100,6 @@ export module TimeSheetReporterBot {
      */
     export class Bot {
 
-        /**
-         * Gönderimi yapılacak bilgiler için ön hazırlık
-         */
         private opts = {
             method: "POST",
             json: true,
@@ -235,38 +112,118 @@ export module TimeSheetReporterBot {
         };
         private owner: number;
         private trackerId: number;
-        private isCompleted: boolean = false;
         private daysLeft: number;
+        private nextTracker: number;
+        private hasRecords: boolean;
 
         constructor() {
-            this.getTrackerId();
+            this.getProps().then((values) => {
+                this.getSome().then((res) => {
+                    console.warn(res);
+                });
+            }).catch((err) => {
+                console.error(err);
+            });
         }
 
-        getTrackerId() {
+        private static getDateInfos() {
+            return {
+                currentDate: new Date(new Date().setHours(0, 0, 0, 0)).toISOString().slice(0, -5),
+                weekNumber: (() => {
+                    let now: any = new Date();
+                    let s: any = new Date(now.getFullYear(), 0, 1);
+                    return Math.ceil((((now - s) / 86400000) + s.getDay() + 1) / 7);
+                })(),
+                monthNumber: new Date().getMonth() + 1,
+                year: new Date().getFullYear()
+            }
+        }
+
+        /**
+         * Kayıt yapılacak çizelgenin dolu olup olmadığını kontrol eder
+         */
+        async getSome() {
             this.opts.body = {
-                "fields": FILTER_FILEDS,
-                "filters": [{"field": "week", "operator": "equals", "value": 11, "no": 1}, {
-                    "field": "year",
-                    "operator": "equals",
-                    "value": 2019,
-                    "no": 2
-                }, {"field": "month", "operator": "equals", "value": 3, "no": 3}, {
+                "fields": ["owner", "related_timetracker", "saat", "aciklama", "created_by", "created_at", "updated_by",
+                    "updated_at", "tarih", "gorev", "faturalanabilir_faturalanmaz", "proje", "izindir", "opportunity",
+                    "izinid", "kayit_kitle", "proje.projeler.proje_kisa_kodu", "opportunity.firsatlar.opportunity_name"],
+                "filters": [{
                     "field": "owner",
                     "operator": "equals",
-                    "value": 9722,
+                    "value": OWNER,
+                    "no": 1
+                }, {"field": "related_timetracker", "operator": "equals", "value": await this.trackerId, "no": 2}],
+                "sort_field": "created_at",
+                "sort_direction": "desc",
+                "limit": 2000
+            };
+            return new Promise((resolve, reject) => {
+                request.post(ApiEndPoints.GetCreatedTrackers, this.opts, ((err: Error, resp, body: ITimeTrackerListResponse[]) => {
+                    if (err) {
+                        reject(err.message);
+                    }
+                    if (body.length < 1) {
+                        resolve(this.hasRecords = false);
+                    }
+                }));
+            });
+        }
+
+        /**
+         * Zaman çizelgesi bilgilerini alır
+         */
+        async getProps() {
+            this.opts.body = {
+                "fields": FILTER_FILEDS,
+                "filters": [{"field": "week", "operator": "equals", "value": Bot.getDateInfos().weekNumber, "no": 1}, {
+                    "field": "year",
+                    "operator": "equals",
+                    "value": new Date().getFullYear(),
+                    "no": 2
+                }, {
+                    "field": "month",
+                    "operator": "equals",
+                    "value": Bot.getDateInfos().monthNumber,
+                    "no": Bot.getDateInfos().monthNumber
+                }, {
+                    "field": "owner",
+                    "operator": "equals",
+                    "value": Number(OWNER),
                     "no": 4
                 }],
                 "limit": 1
             };
-            request.post(ApiEndPoints.GetTrackers, this.opts, ((err: Error, resp, body: ITimeTrackerListResponse[]) => {
+            return new Promise((resolve, reject) => {
+                request.post(ApiEndPoints.GetTrackers, this.opts, (
+                    (err: Error, resp, body: ITimeTrackerListResponse[] | any) => {
+                        if (err || body.hasOwnProperty('message')) {
+                            reject({clientErr: err, respErr: body.message});
+                        } else {
+                            resolve(body.filter((x) => {
+                                return {
+                                    value: () => {
+                                        if (x.kalan === -45) {
+                                            this.daysLeft = x.kalan;
+                                            this.trackerId = x.timetracker_id;
+                                            this.owner = x.owner;
+                                        }
+                                    }
+                                }
+                            }));
+                        }
+                    }));
+            });
+        }
+
+        /**
+         * Girişi yapılmış çizelgeleri onay'a gönderir
+         */
+        sendToApproval() {
+            request.post(ApiEndPoints.SendToApproval, this.opts, ((err: Error, resp, body: ITimeTrackerCreateResponse) => {
                 if (err) return err.message;
-                body.filter((x) => {
-                    if (x.kalan === -45) {
-                        this.daysLeft = x.kalan;
-                        this.trackerId = x.timetracker_id;
-                        this.owner = x.owner;
-                    }
-                });
+                if (body.hasOwnProperty('created_at')) {
+                    console.info('OK')
+                }
             }));
         }
 
@@ -275,8 +232,8 @@ export module TimeSheetReporterBot {
          */
         createItem() {
             this.opts.body = {
-                "owner": OWNER,
-                "tarih": new Date(new Date().setHours(0, 0, 0, 0)).toISOString().slice(0, -5),
+                "owner": Number(OWNER),
+                "tarih": Bot.getDateInfos().currentDate,
                 "izindir": false,
                 "kayit_kitle": KITLE,
                 "saat": TIME_COUNT,
@@ -295,25 +252,12 @@ export module TimeSheetReporterBot {
             }));
         }
 
-        /**
-         * Girişi yapılmış çizelgeleri onay'a gönderir
-         */
-        sendToApproval() {
-            request.post(ApiEndPoints.SendToApproval, this.opts, ((err: Error, resp, body: ITimeTrackerCreateResponse) => {
-                if (err) return err.message;
-                if (body.hasOwnProperty('created_at')) {
-                    console.info('OK')
-                }
-            }));
-        }
-
     }
 
     /**
      * Bot'u çalıştır
      */
     const app = new Bot();
-    app.createItem();
 
     /**
      * Belirtilen sıklıkta(milisaniye) kontrolleri çalıştırıp
@@ -325,13 +269,19 @@ export module TimeSheetReporterBot {
          * zaman çizelgesine giriş yapar.
          */
         if (!Object.values(WeekEnds).includes(new Date().getDay())) {
-            app.createItem();
-            /**
-             * Cuma günü geldiğinde onay'a gönderir
-             */
-            if (new Date().getDay() === WeekEnds.Friday) {
-                app.sendToApproval();
-            }
+            app.getProps().then(() => {
+                app.createItem();
+                /**
+                 * Cuma günü geldiğinde onay'a gönderir
+                 */
+                if (new Date().getDay() === WeekEnds.Friday) {
+                    app.sendToApproval();
+                }
+            }).catch((err) => {
+                console.error(err);
+            }).catch((err) => {
+                console.error(err)
+            });
         }
     }, Number(REPORT_CHECK_INTERVAL));
 }

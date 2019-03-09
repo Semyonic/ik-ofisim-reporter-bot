@@ -7,8 +7,8 @@
   },
   "extends": "google",
   "globals": {
-    "Atomics": "readonly",
-    "SharedArrayBuffer": "readonly"
+    "Atomics": false,
+    "SharedArrayBuffer": false
   },
   "parserOptions": {
     "ecmaVersion": 2018,
