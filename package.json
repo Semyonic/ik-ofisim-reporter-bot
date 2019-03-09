@@ -9,7 +9,7 @@
   "description": "A bot that sends daily reports to ik.ofisim.com",
   "repository": {
     "type": "git",
-    "url": "https://github.com/flaviocopes/testing.git"
+    "url": "https://github.com/Semyonic/ofisim-ik-reporter-bot.git"
   },
   "keywords": [
     "bot",
