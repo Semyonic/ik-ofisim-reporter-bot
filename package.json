@@ -17,6 +17,9 @@
     "automation"
   ],
   "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
   "license": "MIT",
   "engines": {
     "node": ">= 6.0.0"
@@ -27,8 +30,10 @@
   },
   "devDependencies": {
     "typescript": "^3.3.3333",
+    "typings": "^2.1.1",
     "mocha": "^6.0.2",
     "chai": "^4.2.0",
+    "mocha-typescript": "^1.1.17",
     "@types/dotenv": "^6.1.0",
     "@types/node": "^11.10.4",
     "@types/request": "^2.48.1",

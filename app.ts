@@ -16,7 +16,7 @@ export module TimeSheetReporterBot {
     export enum WeekEnds {
         Friday = 5,
         Saturday = 6,
-        Sunday = 7,
+        Sunday = 0,
     }
 
     /**
@@ -117,10 +117,8 @@ export module TimeSheetReporterBot {
         private hasRecords: boolean;
 
         constructor() {
-            this.getProps().then((values) => {
-                this.getSome().then((res) => {
-                    console.warn(res);
-                });
+            this.getProps().then(() => {
+                this.getSome()
             }).catch((err) => {
                 console.error(err);
             });
@@ -158,14 +156,16 @@ export module TimeSheetReporterBot {
                 "limit": 2000
             };
             return new Promise((resolve, reject) => {
-                request.post(ApiEndPoints.GetCreatedTrackers, this.opts, ((err: Error, resp, body: ITimeTrackerListResponse[]) => {
-                    if (err) {
-                        reject(err.message);
-                    }
-                    if (body.length < 1) {
-                        resolve(this.hasRecords = false);
-                    }
-                }));
+                request.post(ApiEndPoints.GetCreatedTrackers, this.opts,
+                    ((err: Error, resp, body: ITimeTrackerListResponse[]) => {
+                        if (err) {
+                            reject(err.message);
+                        }
+                        if (body.length < 1) {
+                            this.hasRecords = false;
+                            resolve();
+                        }
+                    }));
             });
         }
 
@@ -201,13 +201,13 @@ export module TimeSheetReporterBot {
                         } else {
                             resolve(body.filter((x) => {
                                 return {
-                                    value: () => {
+                                    value: (() => {
                                         if (x.kalan === -45) {
                                             this.daysLeft = x.kalan;
                                             this.trackerId = x.timetracker_id;
                                             this.owner = x.owner;
                                         }
-                                    }
+                                    })()
                                 }
                             }));
                         }
@@ -261,7 +261,7 @@ export module TimeSheetReporterBot {
 
     /**
      * Belirtilen sıklıkta(milisaniye) kontrolleri çalıştırıp
-     * gerekli fonksiyonlarını yerine getirir
+     * gerekli fonksiyonları yerine getirir
      */
     setInterval(() => {
         /**

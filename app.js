@@ -26,7 +26,7 @@ var TimeSheetReporterBot;
     (function (WeekEnds) {
         WeekEnds[WeekEnds["Friday"] = 5] = "Friday";
         WeekEnds[WeekEnds["Saturday"] = 6] = "Saturday";
-        WeekEnds[WeekEnds["Sunday"] = 7] = "Sunday";
+        WeekEnds[WeekEnds["Sunday"] = 0] = "Sunday";
     })(WeekEnds = TimeSheetReporterBot.WeekEnds || (TimeSheetReporterBot.WeekEnds = {}));
     /**
      * Gönderim yapılacak API'lar
@@ -55,13 +55,23 @@ var TimeSheetReporterBot;
                     'Authorization': `Bearer ${TimeSheetReporterBot.TOKEN}`,
                 },
             };
-            this.getProps().then((values) => {
-                this.getSome().then((res) => {
-                    console.warn(res);
-                });
+            this.getProps().then(() => {
+                this.getSome();
             }).catch((err) => {
                 console.error(err);
             });
+        }
+        static getDateInfos() {
+            return {
+                currentDate: new Date(new Date().setHours(0, 0, 0, 0)).toISOString().slice(0, -5),
+                weekNumber: (() => {
+                    let now = new Date();
+                    let s = new Date(now.getFullYear(), 0, 1);
+                    return Math.ceil((((now - s) / 86400000) + s.getDay() + 1) / 7);
+                })(),
+                monthNumber: new Date().getMonth() + 1,
+                year: new Date().getFullYear()
+            };
         }
         /**
          * Kayıt yapılacak çizelgenin dolu olup olmadığını kontrol eder
@@ -88,7 +98,8 @@ var TimeSheetReporterBot;
                             reject(err.message);
                         }
                         if (body.length < 1) {
-                            resolve(this.hasRecords = false);
+                            this.hasRecords = false;
+                            resolve();
                         }
                     }));
                 });
@@ -127,19 +138,31 @@ var TimeSheetReporterBot;
                         else {
                             resolve(body.filter((x) => {
                                 return {
-                                    value: () => {
+                                    value: (() => {
                                         if (x.kalan === -45) {
                                             this.daysLeft = x.kalan;
                                             this.trackerId = x.timetracker_id;
                                             this.owner = x.owner;
                                         }
-                                    }
+                                    })()
                                 };
                             }));
                         }
                     }));
                 });
             });
+        }
+        /**
+         * Girişi yapılmış çizelgeleri onay'a gönderir
+         */
+        sendToApproval() {
+            request.post(ApiEndPoints.SendToApproval, this.opts, ((err, resp, body) => {
+                if (err)
+                    return err.message;
+                if (body.hasOwnProperty('created_at')) {
+                    console.info('OK');
+                }
+            }));
         }
         /**
          * Zaman çizelgesi girişi yapar
@@ -166,30 +189,6 @@ var TimeSheetReporterBot;
                 return body;
             }));
         }
-        /**
-         * Girişi yapılmış çizelgeleri onay'a gönderir
-         */
-        sendToApproval() {
-            request.post(ApiEndPoints.SendToApproval, this.opts, ((err, resp, body) => {
-                if (err)
-                    return err.message;
-                if (body.hasOwnProperty('created_at')) {
-                    console.info('OK');
-                }
-            }));
-        }
-        static getDateInfos() {
-            return {
-                currentDate: new Date(new Date().setHours(0, 0, 0, 0)).toISOString().slice(0, -5),
-                weekNumber: (() => {
-                    let now = new Date();
-                    let s = new Date(now.getFullYear(), 0, 1);
-                    return Math.ceil((((now - s) / 86400000) + s.getDay() + 1) / 7);
-                })(),
-                monthNumber: new Date().getMonth() + 1,
-                year: new Date().getFullYear()
-            };
-        }
     }
     TimeSheetReporterBot.Bot = Bot;
     /**
@@ -198,7 +197,7 @@ var TimeSheetReporterBot;
     const app = new Bot();
     /**
      * Belirtilen sıklıkta(milisaniye) kontrolleri çalıştırıp
-     * gerekli fonksiyonlarını yerine getirir
+     * gerekli fonksiyonları yerine getirir
      */
     setInterval(() => {
         /**
