@@ -120,6 +120,7 @@ export module TimeSheetReporterBot {
         public daysLeft: number;
         public hasRecords: boolean;
         public currentDateInfo;
+        public hasCurrentRecord: boolean = false;
 
         constructor() {
             this.currentDateInfo = Bot.getDateInfos();
@@ -132,7 +133,7 @@ export module TimeSheetReporterBot {
 
         private static getDateInfos() {
             return {
-                currentDate: new Date(new Date().setHours(0, 0, 0, 0)).toISOString().slice(0, -5),
+                currentDate: new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
                 weekNumber: (() => {
                     let now: any = new Date();
                     let s: any = new Date(now.getFullYear(), 0, 1);
@@ -156,7 +157,7 @@ export module TimeSheetReporterBot {
                     "operator": "equals",
                     "value": OWNER,
                     "no": 1
-                }, {"field": "related_timetracker", "operator": "equals", "value": await this.trackerId, "no": 2}],
+                }, {"field": "related_timetracker", "operator": "equals", "value": this.trackerId, "no": 2}],
                 "sort_field": "created_at",
                 "sort_direction": "desc",
                 "limit": 2000
@@ -170,6 +171,8 @@ export module TimeSheetReporterBot {
                         if (body.length < 1) {
                             this.hasRecords = false;
                             resolve();
+                        } else {
+                            this.hasRecords = true;
                         }
                     }));
             });
@@ -237,14 +240,15 @@ export module TimeSheetReporterBot {
          * Zaman çizelgesi girişi yapar
          */
         createItem() {
+            this.opts.body = null;
             this.opts.body = {
                 "owner": Number(OWNER),
                 "tarih": Bot.getDateInfos().currentDate,
                 "izindir": false,
-                "kayit_kitle": KITLE,
-                "saat": TIME_COUNT,
-                "gorev": DEPARTMENT,
-                "proje": PROJECT,
+                "kayit_kitle": Number(KITLE),
+                "saat": Number(TIME_COUNT),
+                "gorev": Number(DEPARTMENT),
+                "proje": Number(PROJECT),
                 "aciklama": DESC,
                 "shared_users": null,
                 "shared_user_groups": null,
@@ -252,10 +256,19 @@ export module TimeSheetReporterBot {
                 "shared_user_groups_edit": null,
                 "related_timetracker": this.trackerId
             };
-            request.post(ApiEndPoints.CreateTracker, this.opts, ((err: Error, resp, body: ITimeTrackerCreateResponse) => {
-                if (err) return err.message;
-                return body;
-            }));
+            if (this.hasRecords) {
+                request.post(ApiEndPoints.CreateTracker, this.opts, ((err: Error, resp, body: ITimeTrackerCreateResponse) => {
+                    if (err) {
+                        return err.message;
+                    }
+                    if (body.id) {
+                        this.hasCurrentRecord = true;
+                    }
+                    return body;
+                }));
+            } else {
+                console.warn('Record exists !');
+            }
         }
     }
 
@@ -290,7 +303,9 @@ export module TimeSheetReporterBot {
                     console.info('Bot is running');
                     if (!Object.values(WeekEnds).includes(new Date().getDay())) {
                         this.bot.getProps().then(() => {
-                            this.bot.createItem();
+                            if (!this.bot.hasCurrentRecord) {
+                                this.bot.createItem();
+                            }
                             if (new Date().getDay() === WeekEnds.Friday) {
                                 this.bot.sendToApproval();
                             }
@@ -314,6 +329,7 @@ export module TimeSheetReporterBot {
                 })(),
                 date: this.dateInfo,
                 auth: this.tokenInfo,
+                reportId: this.bot.trackerId,
             };
         }
 
@@ -330,6 +346,9 @@ export module TimeSheetReporterBot {
             server.on('request', (request, response) => {
                 if (request.method === 'GET') {
                     switch (request.url) {
+                        case ROUTES.root:
+                            response.end('It looks bot is running !');
+                            break;
                         case ROUTES.info:
                             response.end(JSON.stringify(this.debugBot(), null, 4));
                             break;

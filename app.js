@@ -58,6 +58,7 @@ var TimeSheetReporterBot;
                     'Authorization': `Bearer ${TimeSheetReporterBot.TOKEN}`,
                 },
             };
+          this.hasCurrentRecord = false;
             this.currentDateInfo = Bot.getDateInfos();
             this.getProps().then(() => {
                 this.getSome().then();
@@ -67,7 +68,7 @@ var TimeSheetReporterBot;
         }
         static getDateInfos() {
             return {
-                currentDate: new Date(new Date().setHours(0, 0, 0, 0)).toISOString().slice(0, -5),
+              currentDate: new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
                 weekNumber: (() => {
                     let now = new Date();
                     let s = new Date(now.getFullYear(), 0, 1);
@@ -91,7 +92,12 @@ var TimeSheetReporterBot;
                             "operator": "equals",
                             "value": TimeSheetReporterBot.OWNER,
                             "no": 1
-                        }, { "field": "related_timetracker", "operator": "equals", "value": yield this.trackerId, "no": 2 }],
+                    }, {
+                      'field': 'related_timetracker',
+                      'operator': 'equals',
+                      'value': this.trackerId,
+                      'no': 2,
+                    }],
                     "sort_field": "created_at",
                     "sort_direction": "desc",
                     "limit": 2000
@@ -104,6 +110,8 @@ var TimeSheetReporterBot;
                         if (body.length < 1) {
                             this.hasRecords = false;
                             resolve();
+                        } else {
+                          this.hasRecords = true;
                         }
                     }));
                 });
@@ -172,14 +180,15 @@ var TimeSheetReporterBot;
          * Zaman çizelgesi girişi yapar
          */
         createItem() {
+          this.opts.body = null;
             this.opts.body = {
                 "owner": Number(TimeSheetReporterBot.OWNER),
                 "tarih": Bot.getDateInfos().currentDate,
                 "izindir": false,
-                "kayit_kitle": TimeSheetReporterBot.KITLE,
-                "saat": TimeSheetReporterBot.TIME_COUNT,
-                "gorev": TimeSheetReporterBot.DEPARTMENT,
-                "proje": TimeSheetReporterBot.PROJECT,
+              'kayit_kitle': Number(TimeSheetReporterBot.KITLE),
+              'saat': Number(TimeSheetReporterBot.TIME_COUNT),
+              'gorev': Number(TimeSheetReporterBot.DEPARTMENT),
+              'proje': Number(TimeSheetReporterBot.PROJECT),
                 "aciklama": TimeSheetReporterBot.DESC,
                 "shared_users": null,
                 "shared_user_groups": null,
@@ -187,11 +196,19 @@ var TimeSheetReporterBot;
                 "shared_user_groups_edit": null,
                 "related_timetracker": this.trackerId
             };
+          if (this.hasRecords) {
             request.post(ApiEndPoints.CreateTracker, this.opts, ((err, resp, body) => {
-                if (err)
-                    return err.message;
-                return body;
+              if (err) {
+                return err.message;
+              }
+              if (body.id) {
+                this.hasCurrentRecord = true;
+              }
+              return body;
             }));
+          } else {
+            console.warn('Record exists !');
+          }
         }
     }
     class Server {
@@ -219,7 +236,9 @@ var TimeSheetReporterBot;
                     console.info('Bot is running');
                     if (!Object.values(WeekEnds).includes(new Date().getDay())) {
                         this.bot.getProps().then(() => {
+                          if (!this.bot.hasCurrentRecord) {
                             this.bot.createItem();
+                          }
                             if (new Date().getDay() === WeekEnds.Friday) {
                                 this.bot.sendToApproval();
                             }
@@ -243,6 +262,7 @@ var TimeSheetReporterBot;
                 })(),
                 date: this.dateInfo,
                 auth: this.tokenInfo,
+              reportId: this.bot.trackerId,
             };
         }
         killBot() {
@@ -258,6 +278,9 @@ var TimeSheetReporterBot;
             server.on('request', (request, response) => {
                 if (request.method === 'GET') {
                     switch (request.url) {
+                      case TimeSheetReporterBot.ROUTES.root:
+                        response.end('It looks bot is running !');
+                        break;
                         case TimeSheetReporterBot.ROUTES.info:
                             response.end(JSON.stringify(this.debugBot(), null, 4));
                             break;
