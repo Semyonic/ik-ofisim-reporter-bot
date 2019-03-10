@@ -56,10 +56,21 @@ Use it in a Serverless environment!
 ```bash
 yarn start
 ```
+OR
+```bash
+docker pull semyonic/ik-ofisim-bot
+docker run -p 3000:3000/tcp semyonic/ik-ofisim-bot
+```
+
+## Management
+
+| EndPoint | Method |Description |
+| --- | --- | --- |
+| `/start` | GET |
+| `/info` | GET |
+| `/kill` | POST |
 
 ## Questions
-
-**Docker Image** on its way !
 
 Visit me at **Level -1 Office**
  
@@ -68,6 +79,6 @@ or
 [Mail Me](<mailto:semih.onay@etiya.com?subject=About Reporter Bot>)
 
 ## License
-Use and spread it with my **Name**
+Use and spread it with my **Name** !
 
 MIT © [Semih Onay](https://semihonay.tk)
