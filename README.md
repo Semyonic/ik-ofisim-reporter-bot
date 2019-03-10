@@ -66,9 +66,9 @@ docker run -p 3000:3000/tcp semyonic/ik-ofisim-bot
 
 | EndPoint | Method |Description |
 | --- | --- | --- |
-| `/start` | GET |
-| `/info` | GET |
-| `/kill` | POST |
+| `/start` | GET | Starts the bot |
+| `/info` | GET | Gets information about current status, week, month, etc..|
+| `/kill` | POST | Kills the bot (Only interval. Instance won't be affected)|
 
 ## Questions
 
