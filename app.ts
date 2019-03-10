@@ -1,10 +1,15 @@
 import dotnev = require('dotenv');
+import http = require('http');
+
+const server = http.createServer().listen(3000);
 import request = require('request');
+
 
 export module TimeSheetReporterBot {
 
     dotnev.config();
     export const {TOKEN, OWNER, USER_AGENT, KITLE, DEPARTMENT, TIME_COUNT, PROJECT, DESC, REPORT_CHECK_INTERVAL} = process.env;
+    export const ROUTES = {root: '/', start: '/start', health: '/health', kill: '/kill', stop: '/stop', info: '/info'};
     export const FILTER_FILEDS = ["owner", "week", "year", "timetracker_id", "created_by", "created_at", "updated_by",
         "updated_at", "custom_approver", "date_range", "toplam_saat", "ay", "month", "custom_approver_2", "calisan",
         "tamamlanan_saat", "tarih", "tamamlandi", "hafta_toplami", "kalan", "ilgili_ay", "approver", "process_date",
@@ -98,9 +103,9 @@ export module TimeSheetReporterBot {
      * yapılan konfigürasyon doğrultusunda raporları girer,
      * her Cuma günü onay'a gönderir
      */
-    export class Bot {
+    class Bot {
 
-        private opts = {
+        public opts = {
             method: "POST",
             json: true,
             body: null,
@@ -110,15 +115,16 @@ export module TimeSheetReporterBot {
                 'Authorization': `Bearer ${TOKEN}`,
             },
         };
-        private owner: number;
-        private trackerId: number;
-        private daysLeft: number;
-        private nextTracker: number;
-        private hasRecords: boolean;
+        public owner: number;
+        public trackerId: number;
+        public daysLeft: number;
+        public hasRecords: boolean;
+        public currentDateInfo;
 
         constructor() {
+            this.currentDateInfo = Bot.getDateInfos();
             this.getProps().then(() => {
-                this.getSome()
+                this.getSome().then();
             }).catch((err) => {
                 console.error(err);
             });
@@ -197,7 +203,7 @@ export module TimeSheetReporterBot {
                 request.post(ApiEndPoints.GetTrackers, this.opts, (
                     (err: Error, resp, body: ITimeTrackerListResponse[] | any) => {
                         if (err || body.hasOwnProperty('message')) {
-                            reject({clientErr: err, respErr: body.message});
+                            reject({clientErr: err, respErr: body.message, detail: this.opts});
                         } else {
                             resolve(body.filter((x) => {
                                 return {
@@ -251,37 +257,111 @@ export module TimeSheetReporterBot {
                 return body;
             }));
         }
-
     }
 
-    /**
-     * Bot'u çalıştır
-     */
-    const app = new Bot();
+    class Server {
 
-    /**
-     * Belirtilen sıklıkta(milisaniye) kontrolleri çalıştırıp
-     * gerekli fonksiyonları yerine getirir
-     */
-    setInterval(() => {
-        /**
-         * İçinde bulunduğu günün, haftaiçi olup olmadığını ayrıt eder
-         * zaman çizelgesine giriş yapar.
-         */
-        if (!Object.values(WeekEnds).includes(new Date().getDay())) {
-            app.getProps().then(() => {
-                app.createItem();
-                /**
-                 * Cuma günü geldiğinde onay'a gönderir
-                 */
-                if (new Date().getDay() === WeekEnds.Friday) {
-                    app.sendToApproval();
+        private readonly server;
+        private readonly dateInfo;
+        private readonly tokenInfo;
+        private instance;
+
+        constructor(private bot: Bot) {
+            this.server = server;
+            this.hasInstance();
+            this.startBot();
+            this.commandHandler();
+            this.dateInfo = {CurrentWeekNumber: this.bot.currentDateInfo};
+            this.tokenInfo = {AuthToken: this.bot.opts.headers.Authorization};
+            console.warn('Server started at', server.address()['port']);
+        }
+
+        private hasInstance() {
+            if (this.bot instanceof Bot) {
+                return this.bot;
+            } else {
+                return false;
+            }
+        }
+
+        private startBot(): string {
+            if (this.instance === undefined) {
+                this.instance = setInterval(() => {
+                    console.info('Bot is running');
+                    if (!Object.values(WeekEnds).includes(new Date().getDay())) {
+                        this.bot.getProps().then(() => {
+                            this.bot.createItem();
+                            if (new Date().getDay() === WeekEnds.Friday) {
+                                this.bot.sendToApproval();
+                            }
+                        }).catch((err) => {
+                            console.error(err);
+                        }).catch((err) => {
+                            console.error(err)
+                        });
+                    }
+                }, Number(REPORT_CHECK_INTERVAL));
+                return 'Started ...';
+            } else {
+                return 'Cannot start. An instance already running';
+            }
+        }
+
+        private debugBot(): Object {
+            return {
+                running: (() => {
+                    return this.instance !== undefined;
+                })(),
+                date: this.dateInfo,
+                auth: this.tokenInfo,
+            };
+        }
+
+        private killBot(): string {
+            if (this.instance === undefined) {
+                return 'Cannot kill already killed bot !';
+            } else {
+                this.instance = clearInterval(this.instance);
+                return 'Bot killed !';
+            }
+        }
+
+        private commandHandler(): void {
+            server.on('request', (request, response) => {
+                if (request.method === 'GET') {
+                    switch (request.url) {
+                        case ROUTES.info:
+                            response.end(JSON.stringify(this.debugBot(), null, 4));
+                            break;
+                        default:
+                            response.end('No such command !');
+                            break;
+                    }
+                } else if (request.method === 'POST') {
+                    switch (request.url) {
+                        case ROUTES.start:
+                            response.end(this.startBot());
+                            break;
+                        case ROUTES.kill:
+                            response.end(this.killBot());
+                            break;
+                        default:
+                            response.end('No such command');
+                            break;
+                    }
                 }
-            }).catch((err) => {
-                console.error(err);
-            }).catch((err) => {
-                console.error(err)
             });
         }
-    }, Number(REPORT_CHECK_INTERVAL));
+    }
+
+    export const bt = new Bot();
+    export const srv = new Server(bt);
+
+    export const Instance = () => {
+        return {Bot: bt, srv: srv}
+    };
 }
+
+(() => {
+    TimeSheetReporterBot.Instance();
+})();

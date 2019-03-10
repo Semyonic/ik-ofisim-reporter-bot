@@ -65,14 +65,13 @@ cmake-build-*/
 .idea/**/mongoSettings.xml
 *.iws
 out/
-.idea_modules/
+.idea/
 atlassian-ide-plugin.xml
 .idea/replstate.xml
 com_crashlytics_export_strings.xml
 crashlytics.properties
 crashlytics-build.properties
 fabric.properties
-.idea/httpRequests
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
