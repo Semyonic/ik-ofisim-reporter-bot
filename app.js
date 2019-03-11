@@ -10,6 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const dotnev = require("dotenv");
 const http = require("http");
+const moment = require('moment');
 const server = http.createServer().listen(3000);
 const request = require("request");
 var TimeSheetReporterBot;
@@ -22,6 +23,9 @@ var TimeSheetReporterBot;
         "updated_at", "custom_approver", "date_range", "toplam_saat", "ay", "month", "custom_approver_2", "calisan",
         "tamamlanan_saat", "tarih", "tamamlandi", "hafta_toplami", "kalan", "ilgili_ay", "approver", "process_date",
         "approver_order", "process_status_list"];
+  TimeSheetReporterBot.INIT_FILTER_FIELDS = ['owner', 'related_timetracker', 'saat', 'aciklama', 'created_by', 'created_at', 'updated_by',
+    'updated_at', 'tarih', 'gorev', 'faturalanabilir_faturalanmaz', 'proje', 'izindir', 'opportunity',
+    'izinid', 'kayit_kitle', 'proje.projeler.proje_kisa_kodu', 'opportunity.firsatlar.opportunity_name'];
     /**
      * Haftasonunu işaret eder
      */
@@ -68,7 +72,7 @@ var TimeSheetReporterBot;
         }
         static getDateInfos() {
             return {
-              currentDate: new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
+              currentDate: moment().format('YYYY-MM-DD[T]HH:mm:ss'),
                 weekNumber: (() => {
                     let now = new Date();
                     let s = new Date(now.getFullYear(), 0, 1);
@@ -84,9 +88,7 @@ var TimeSheetReporterBot;
         getSome() {
             return __awaiter(this, void 0, void 0, function* () {
                 this.opts.body = {
-                    "fields": ["owner", "related_timetracker", "saat", "aciklama", "created_by", "created_at", "updated_by",
-                        "updated_at", "tarih", "gorev", "faturalanabilir_faturalanmaz", "proje", "izindir", "opportunity",
-                        "izinid", "kayit_kitle", "proje.projeler.proje_kisa_kodu", "opportunity.firsatlar.opportunity_name"],
+                  'fields': TimeSheetReporterBot.INIT_FILTER_FIELDS,
                     "filters": [{
                             "field": "owner",
                             "operator": "equals",
@@ -196,7 +198,8 @@ var TimeSheetReporterBot;
                 "shared_user_groups_edit": null,
                 "related_timetracker": this.trackerId
             };
-          if (this.hasRecords) {
+          if (!this.hasRecords) {
+            this.hasRecords = true;
             request.post(ApiEndPoints.CreateTracker, this.opts, ((err, resp, body) => {
               if (err) {
                 return err.message;
@@ -207,7 +210,7 @@ var TimeSheetReporterBot;
               return body;
             }));
           } else {
-            console.warn('Record exists !');
+            this.hasCurrentRecord = true;
           }
         }
     }
@@ -233,13 +236,12 @@ var TimeSheetReporterBot;
         startBot() {
             if (this.instance === undefined) {
                 this.instance = setInterval(() => {
-                    console.info('Bot is running');
                     if (!Object.values(WeekEnds).includes(new Date().getDay())) {
                         this.bot.getProps().then(() => {
                           if (!this.bot.hasCurrentRecord) {
                             this.bot.createItem();
                           }
-                            if (new Date().getDay() === WeekEnds.Friday) {
+                          if (new Date().getDay() === WeekEnds.Friday && this.bot.daysLeft === 0) {
                                 this.bot.sendToApproval();
                             }
                         }).catch((err) => {

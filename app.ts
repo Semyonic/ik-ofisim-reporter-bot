@@ -1,5 +1,6 @@
 import dotnev = require('dotenv');
 import http = require('http');
+import moment = require('moment');
 
 const server = http.createServer().listen(3000);
 import request = require('request');
@@ -14,6 +15,9 @@ export module TimeSheetReporterBot {
         "updated_at", "custom_approver", "date_range", "toplam_saat", "ay", "month", "custom_approver_2", "calisan",
         "tamamlanan_saat", "tarih", "tamamlandi", "hafta_toplami", "kalan", "ilgili_ay", "approver", "process_date",
         "approver_order", "process_status_list"];
+    export const INIT_FILTER_FIELDS = ["owner", "related_timetracker", "saat", "aciklama", "created_by", "created_at", "updated_by",
+        "updated_at", "tarih", "gorev", "faturalanabilir_faturalanmaz", "proje", "izindir", "opportunity",
+        "izinid", "kayit_kitle", "proje.projeler.proje_kisa_kodu", "opportunity.firsatlar.opportunity_name"];
 
     /**
      * Haftasonunu işaret eder
@@ -133,7 +137,7 @@ export module TimeSheetReporterBot {
 
         private static getDateInfos() {
             return {
-                currentDate: new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
+                currentDate: moment().format("YYYY-MM-DD[T]HH:mm:ss"),
                 weekNumber: (() => {
                     let now: any = new Date();
                     let s: any = new Date(now.getFullYear(), 0, 1);
@@ -149,9 +153,7 @@ export module TimeSheetReporterBot {
          */
         async getSome() {
             this.opts.body = {
-                "fields": ["owner", "related_timetracker", "saat", "aciklama", "created_by", "created_at", "updated_by",
-                    "updated_at", "tarih", "gorev", "faturalanabilir_faturalanmaz", "proje", "izindir", "opportunity",
-                    "izinid", "kayit_kitle", "proje.projeler.proje_kisa_kodu", "opportunity.firsatlar.opportunity_name"],
+                "fields": INIT_FILTER_FIELDS,
                 "filters": [{
                     "field": "owner",
                     "operator": "equals",
@@ -256,7 +258,8 @@ export module TimeSheetReporterBot {
                 "shared_user_groups_edit": null,
                 "related_timetracker": this.trackerId
             };
-            if (this.hasRecords) {
+            if (!this.hasRecords) {
+                this.hasRecords = true;
                 request.post(ApiEndPoints.CreateTracker, this.opts, ((err: Error, resp, body: ITimeTrackerCreateResponse) => {
                     if (err) {
                         return err.message;
@@ -267,7 +270,7 @@ export module TimeSheetReporterBot {
                     return body;
                 }));
             } else {
-                console.warn('Record exists !');
+                this.hasCurrentRecord = true;
             }
         }
     }
@@ -289,7 +292,7 @@ export module TimeSheetReporterBot {
             console.warn('Server started at', server.address()['port']);
         }
 
-        private hasInstance() {
+        private hasInstance(): Bot | boolean {
             if (this.bot instanceof Bot) {
                 return this.bot;
             } else {
@@ -300,13 +303,12 @@ export module TimeSheetReporterBot {
         private startBot(): string {
             if (this.instance === undefined) {
                 this.instance = setInterval(() => {
-                    console.info('Bot is running');
                     if (!Object.values(WeekEnds).includes(new Date().getDay())) {
                         this.bot.getProps().then(() => {
                             if (!this.bot.hasCurrentRecord) {
                                 this.bot.createItem();
                             }
-                            if (new Date().getDay() === WeekEnds.Friday) {
+                            if (new Date().getDay() === WeekEnds.Friday && this.bot.daysLeft === 0) {
                                 this.bot.sendToApproval();
                             }
                         }).catch((err) => {

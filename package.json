@@ -26,7 +26,8 @@
   },
   "dependencies": {
     "dotenv": "^6.2.0",
-    "request": "^2.88.0"
+    "request": "^2.88.0",
+    "moment": "^2.24.0"
   },
   "devDependencies": {
     "typescript": "^3.3.3333",
