@@ -62,25 +62,14 @@ var TimeSheetReporterBot;
                     'Authorization': `Bearer ${TimeSheetReporterBot.TOKEN}`,
                 },
             };
+          this.approved = false;
+          this.completed = false;
           this.hasCurrentRecord = false;
-            this.currentDateInfo = Bot.getDateInfos();
             this.getProps().then(() => {
-                this.getSome().then();
+              this.getSome();
             }).catch((err) => {
                 console.error(err);
             });
-        }
-        static getDateInfos() {
-            return {
-              currentDate: moment().format('YYYY-MM-DD[T]HH:mm:ss'),
-                weekNumber: (() => {
-                    let now = new Date();
-                    let s = new Date(now.getFullYear(), 0, 1);
-                    return Math.ceil((((now - s) / 86400000) + s.getDay() + 1) / 7);
-                })(),
-                monthNumber: new Date().getMonth() + 1,
-                year: new Date().getFullYear()
-            };
         }
         /**
          * Kayıt yapılacak çizelgenin dolu olup olmadığını kontrol eder
@@ -124,9 +113,19 @@ var TimeSheetReporterBot;
          */
         getProps() {
             return __awaiter(this, void 0, void 0, function* () {
+              let weekNumber = (() => {
+                let now = new Date();
+                let s = new Date(now.getFullYear(), 0, 1);
+                return Math.ceil((((now - s) / 86400000) + s.getDay() + 1) / 7);
+              })();
                 this.opts.body = {
                     "fields": TimeSheetReporterBot.FILTER_FILEDS,
-                    "filters": [{ "field": "week", "operator": "equals", "value": Bot.getDateInfos().weekNumber, "no": 1 }, {
+                  'filters': [{
+                    'field': 'week',
+                    'operator': 'equals',
+                    'value': weekNumber,
+                    'no': 1,
+                  }, {
                             "field": "year",
                             "operator": "equals",
                             "value": new Date().getFullYear(),
@@ -134,8 +133,8 @@ var TimeSheetReporterBot;
                         }, {
                             "field": "month",
                             "operator": "equals",
-                            "value": Bot.getDateInfos().monthNumber,
-                            "no": Bot.getDateInfos().monthNumber
+                    'value': new Date().getMonth() + 1,
+                    'no': new Date().getMonth() + 1,
                         }, {
                             "field": "owner",
                             "operator": "equals",
@@ -150,17 +149,16 @@ var TimeSheetReporterBot;
                             reject({ clientErr: err, respErr: body.message, detail: this.opts });
                         }
                         else {
-                            resolve(body.filter((x) => {
-                                return {
-                                    value: (() => {
-                                        if (x.kalan === -45) {
-                                            this.daysLeft = x.kalan;
-                                            this.trackerId = x.timetracker_id;
-                                            this.owner = x.owner;
-                                        }
-                                    })()
-                                };
-                            }));
+                          body.map((x) => {
+                            if (x.approver !== null) {
+                              this.approved = true;
+                            }
+                            this.completed = x.tamamlandi;
+                            this.completedHours = x.tamamlanan_saat;
+                            this.currentRange = x.date_range;
+                            this.currentMonth = x.ilgili_ay;
+                          });
+                          resolve();
                         }
                     }));
                 });
@@ -185,7 +183,7 @@ var TimeSheetReporterBot;
           this.opts.body = null;
             this.opts.body = {
                 "owner": Number(TimeSheetReporterBot.OWNER),
-                "tarih": Bot.getDateInfos().currentDate,
+              'tarih': moment().format('YYYY-MM-DD[T]HH:mm:ss'),
                 "izindir": false,
               'kayit_kitle': Number(TimeSheetReporterBot.KITLE),
               'saat': Number(TimeSheetReporterBot.TIME_COUNT),
@@ -218,30 +216,20 @@ var TimeSheetReporterBot;
         constructor(bot) {
             this.bot = bot;
             this.server = server;
-            this.hasInstance();
             this.startBot();
             this.commandHandler();
-            this.dateInfo = { CurrentWeekNumber: this.bot.currentDateInfo };
             this.tokenInfo = { AuthToken: this.bot.opts.headers.Authorization };
             console.warn('Server started at', server.address()['port']);
-        }
-        hasInstance() {
-            if (this.bot instanceof Bot) {
-                return this.bot;
-            }
-            else {
-                return false;
-            }
         }
         startBot() {
             if (this.instance === undefined) {
                 this.instance = setInterval(() => {
                     if (!Object.values(WeekEnds).includes(new Date().getDay())) {
                         this.bot.getProps().then(() => {
-                          if (!this.bot.hasCurrentRecord) {
+                          if (!this.bot.hasCurrentRecord && this.bot.completed === false) {
                             this.bot.createItem();
                           }
-                          if (new Date().getDay() === WeekEnds.Friday && this.bot.daysLeft === 0) {
+                          if (new Date().getDay() === WeekEnds.Friday && this.bot.hoursLeft === 0) {
                                 this.bot.sendToApproval();
                             }
                         }).catch((err) => {
@@ -250,7 +238,7 @@ var TimeSheetReporterBot;
                             console.error(err);
                         });
                     }
-                }, Number(TimeSheetReporterBot.REPORT_CHECK_INTERVAL));
+                }, Number(1000));
                 return 'Started ...';
             }
             else {
@@ -262,7 +250,7 @@ var TimeSheetReporterBot;
                 running: (() => {
                     return this.instance !== undefined;
                 })(),
-                date: this.dateInfo,
+              date: moment().format('YYYY-MM-DD[T]HH:mm:ss'),
                 auth: this.tokenInfo,
               reportId: this.bot.trackerId,
             };
