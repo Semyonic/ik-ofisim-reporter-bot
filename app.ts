@@ -127,12 +127,18 @@ export module TimeSheetReporterBot {
         public completedHours: string;
         public approved: boolean = false;
         public completed: boolean = false;
-        public hasRecords: boolean;
+        public isInitialized: boolean = false;
         public hasCurrentRecord: boolean = false;
+        public latestData: ITimeTrackerListResponse[];
+        public debugDateData: ITimeTrackerListResponse;
 
         constructor() {
-            this.getProps().then(() => {
-                this.getSome();
+            this.init().then();
+        }
+
+        async init() {
+            await this.getProps().then(() => {
+                this.getSome().then();
             }).catch((err) => {
                 console.error(err);
             });
@@ -154,18 +160,13 @@ export module TimeSheetReporterBot {
                 "sort_direction": "desc",
                 "limit": 2000
             };
-            return new Promise((resolve, reject) => {
+            return await new Promise((resolve, reject) => {
                 request.post(ApiEndPoints.GetCreatedTrackers, this.opts,
                     ((err: Error, resp, body: ITimeTrackerListResponse[]) => {
                         if (err) {
                             reject(err.message);
                         }
-                        if (body.length < 1) {
-                            this.hasRecords = false;
-                            resolve();
-                        } else {
-                            this.hasRecords = true;
-                        }
+                        this.latestData = body.reverse();
                     }));
             });
         }
@@ -199,7 +200,7 @@ export module TimeSheetReporterBot {
                 }],
                 "limit": 1
             };
-            return new Promise((resolve, reject) => {
+            return await new Promise((resolve, reject) => {
                 request.post(ApiEndPoints.GetTrackers, this.opts, (
                     (err: Error, resp, body: ITimeTrackerListResponse[] | any) => {
                         if (err || body.hasOwnProperty('message')) {
@@ -209,11 +210,14 @@ export module TimeSheetReporterBot {
                                 if (x.approver !== null) {
                                     this.approved = true;
                                 }
+                                this.trackerId = x.timetracker_id;
                                 this.completed = x.tamamlandi;
                                 this.completedHours = x.tamamlanan_saat;
                                 this.currentRange = x.date_range;
                                 this.currentMonth = x.ilgili_ay;
+                                this.debugDateData = x;
                             });
+                            this.isInitialized = true;
                             resolve();
                         }
                     }));
@@ -223,7 +227,7 @@ export module TimeSheetReporterBot {
         /**
          * Girişi yapılmış çizelgeleri onay'a gönderir
          */
-        sendToApproval() {
+        sendToApproval(): void {
             request.post(ApiEndPoints.SendToApproval, this.opts, ((err: Error, resp, body: ITimeTrackerCreateResponse) => {
                 if (err) return err.message;
                 if (body.hasOwnProperty('created_at')) {
@@ -235,8 +239,7 @@ export module TimeSheetReporterBot {
         /**
          * Zaman çizelgesi girişi yapar
          */
-        createItem() {
-            this.opts.body = null;
+        async createItem() {
             this.opts.body = {
                 "owner": Number(OWNER),
                 "tarih": moment().format("YYYY-MM-DD[T]HH:mm:ss"),
@@ -252,20 +255,14 @@ export module TimeSheetReporterBot {
                 "shared_user_groups_edit": null,
                 "related_timetracker": this.trackerId
             };
-            if (!this.hasRecords) {
-                this.hasRecords = true;
-                request.post(ApiEndPoints.CreateTracker, this.opts, ((err: Error, resp, body: ITimeTrackerCreateResponse) => {
-                    if (err) {
-                        return err.message;
-                    }
-                    if (body.id) {
-                        this.hasCurrentRecord = true;
-                    }
-                    return body;
-                }));
-            } else {
-                this.hasCurrentRecord = true;
-            }
+            await request.post(ApiEndPoints.CreateTracker, this.opts, ((err: Error, resp, body: ITimeTrackerCreateResponse) => {
+                if (err) {
+                    return err.message;
+                }
+                if (body.id) {
+                    console.info('Record created');
+                }
+            }));
         }
     }
 
@@ -283,24 +280,34 @@ export module TimeSheetReporterBot {
             console.warn('Server started at', server.address()['port']);
         }
 
+        private check() {
+            if (new Date(this.bot.latestData.slice(-1)[0].created_at).getDay() !== new Date(moment().format("YYYY-MM-DD[T]HH:mm:ss")).getDay()) {
+                this.bot.createItem().then();
+            }
+            if (new Date().getDay() === WeekEnds.Friday && this.bot.hoursLeft === 0) {
+                this.bot.sendToApproval();
+            } else {
+                console.warn('Cannot send approval request. Week not completed yet !');
+            }
+        }
+
         private startBot(): string {
             if (this.instance === undefined) {
                 this.instance = setInterval(() => {
                     if (!Object.values(WeekEnds).includes(new Date().getDay())) {
-                        this.bot.getProps().then(() => {
-                            if (!this.bot.hasCurrentRecord && this.bot.completed === false) {
-                                this.bot.createItem();
-                            }
-                            if (new Date().getDay() === WeekEnds.Friday && this.bot.hoursLeft === 0) {
-                                this.bot.sendToApproval();
-                            }
-                        }).catch((err) => {
-                            console.error(err);
-                        }).catch((err) => {
-                            console.error(err)
-                        });
+                        if (!this.bot.isInitialized) {
+                            this.bot.getProps().then(() => {
+                                this.check();
+                            }).catch((err) => {
+                                console.error(err);
+                            }).catch((err) => {
+                                console.error(err)
+                            });
+                        } else {
+                            this.check();
+                        }
                     }
-                }, Number(1000));
+                }, Number(REPORT_CHECK_INTERVAL));
                 return 'Started ...';
             } else {
                 return 'Cannot start. An instance already running';
@@ -312,7 +319,7 @@ export module TimeSheetReporterBot {
                 running: (() => {
                     return this.instance !== undefined;
                 })(),
-                date: moment().format("YYYY-MM-DD[T]HH:mm:ss"),
+                date: this.bot.debugDateData,
                 auth: this.tokenInfo,
                 reportId: this.bot.trackerId,
             };

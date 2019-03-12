@@ -64,11 +64,18 @@ var TimeSheetReporterBot;
             };
           this.approved = false;
           this.completed = false;
+          this.isInitialized = false;
           this.hasCurrentRecord = false;
-            this.getProps().then(() => {
-              this.getSome();
-            }).catch((err) => {
-                console.error(err);
+          this.init().then();
+        }
+
+      init() {
+        return __awaiter(this, void 0, void 0, function* () {
+          yield this.getProps().then(() => {
+            this.getSome().then();
+          }).catch((err) => {
+            console.error(err);
+          });
             });
         }
         /**
@@ -93,17 +100,12 @@ var TimeSheetReporterBot;
                     "sort_direction": "desc",
                     "limit": 2000
                 };
-                return new Promise((resolve, reject) => {
+              return yield new Promise((resolve, reject) => {
                     request.post(ApiEndPoints.GetCreatedTrackers, this.opts, ((err, resp, body) => {
                         if (err) {
                             reject(err.message);
                         }
-                        if (body.length < 1) {
-                            this.hasRecords = false;
-                            resolve();
-                        } else {
-                          this.hasRecords = true;
-                        }
+                      this.latestData = body.reverse();
                     }));
                 });
             });
@@ -143,7 +145,7 @@ var TimeSheetReporterBot;
                         }],
                     "limit": 1
                 };
-                return new Promise((resolve, reject) => {
+              return yield new Promise((resolve, reject) => {
                     request.post(ApiEndPoints.GetTrackers, this.opts, ((err, resp, body) => {
                         if (err || body.hasOwnProperty('message')) {
                             reject({ clientErr: err, respErr: body.message, detail: this.opts });
@@ -153,11 +155,14 @@ var TimeSheetReporterBot;
                             if (x.approver !== null) {
                               this.approved = true;
                             }
+                            this.trackerId = x.timetracker_id;
                             this.completed = x.tamamlandi;
                             this.completedHours = x.tamamlanan_saat;
                             this.currentRange = x.date_range;
                             this.currentMonth = x.ilgili_ay;
+                            this.debugDateData = x;
                           });
+                          this.isInitialized = true;
                           resolve();
                         }
                     }));
@@ -180,36 +185,31 @@ var TimeSheetReporterBot;
          * Zaman çizelgesi girişi yapar
          */
         createItem() {
-          this.opts.body = null;
+          return __awaiter(this, void 0, void 0, function* () {
             this.opts.body = {
-                "owner": Number(TimeSheetReporterBot.OWNER),
+              'owner': Number(TimeSheetReporterBot.OWNER),
               'tarih': moment().format('YYYY-MM-DD[T]HH:mm:ss'),
-                "izindir": false,
+              'izindir': false,
               'kayit_kitle': Number(TimeSheetReporterBot.KITLE),
               'saat': Number(TimeSheetReporterBot.TIME_COUNT),
               'gorev': Number(TimeSheetReporterBot.DEPARTMENT),
               'proje': Number(TimeSheetReporterBot.PROJECT),
-                "aciklama": TimeSheetReporterBot.DESC,
-                "shared_users": null,
-                "shared_user_groups": null,
-                "shared_users_edit": null,
-                "shared_user_groups_edit": null,
-                "related_timetracker": this.trackerId
+              'aciklama': TimeSheetReporterBot.DESC,
+              'shared_users': null,
+              'shared_user_groups': null,
+              'shared_users_edit': null,
+              'shared_user_groups_edit': null,
+              'related_timetracker': this.trackerId,
             };
-          if (!this.hasRecords) {
-            this.hasRecords = true;
-            request.post(ApiEndPoints.CreateTracker, this.opts, ((err, resp, body) => {
+            yield request.post(ApiEndPoints.CreateTracker, this.opts, ((err, resp, body) => {
               if (err) {
                 return err.message;
               }
               if (body.id) {
-                this.hasCurrentRecord = true;
+                console.info('Record created');
               }
-              return body;
             }));
-          } else {
-            this.hasCurrentRecord = true;
-          }
+          });
         }
     }
     class Server {
@@ -221,24 +221,34 @@ var TimeSheetReporterBot;
             this.tokenInfo = { AuthToken: this.bot.opts.headers.Authorization };
             console.warn('Server started at', server.address()['port']);
         }
+
+      check() {
+        if (new Date(this.bot.latestData.slice(-1)[0].created_at).getDay() !== new Date(moment().format('YYYY-MM-DD[T]HH:mm:ss')).getDay()) {
+          this.bot.createItem().then();
+        }
+        if (new Date().getDay() === WeekEnds.Friday && this.bot.hoursLeft === 0) {
+          this.bot.sendToApproval();
+        } else {
+          console.warn('Cannot send approval request. Week not completed yet !');
+        }
+      }
         startBot() {
             if (this.instance === undefined) {
                 this.instance = setInterval(() => {
                     if (!Object.values(WeekEnds).includes(new Date().getDay())) {
+                      if (!this.bot.isInitialized) {
                         this.bot.getProps().then(() => {
-                          if (!this.bot.hasCurrentRecord && this.bot.completed === false) {
-                            this.bot.createItem();
-                          }
-                          if (new Date().getDay() === WeekEnds.Friday && this.bot.hoursLeft === 0) {
-                                this.bot.sendToApproval();
-                            }
+                          this.check();
                         }).catch((err) => {
-                            console.error(err);
+                          console.error(err);
                         }).catch((err) => {
-                            console.error(err);
+                          console.error(err);
                         });
+                      } else {
+                        this.check();
+                      }
                     }
-                }, Number(1000));
+                }, Number(TimeSheetReporterBot.REPORT_CHECK_INTERVAL));
                 return 'Started ...';
             }
             else {
@@ -250,7 +260,7 @@ var TimeSheetReporterBot;
                 running: (() => {
                     return this.instance !== undefined;
                 })(),
-              date: moment().format('YYYY-MM-DD[T]HH:mm:ss'),
+              date: this.bot.debugDateData,
                 auth: this.tokenInfo,
               reportId: this.bot.trackerId,
             };
