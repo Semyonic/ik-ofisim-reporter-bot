@@ -35,7 +35,7 @@ export module TimeSheetReporterBot {
         GetTrackers = 'https://ik.ofisim.com/api/record/find/timetrackers',
         GetCreatedTrackers = 'https://ik.ofisim.com/api/record/find/timetracker_items',
         CreateTracker = 'https://ik.ofisim.com/api/record/create/timetracker_items?timezone_offset=180',
-        SendToApproval = ''
+        SendToApproval = 'https://ik.ofisim.com/api/process_request/send_approval_manuel'
     }
 
     export interface ITimeTrackerCreateResponse {
@@ -228,6 +228,7 @@ export module TimeSheetReporterBot {
          * Girişi yapılmış çizelgeleri onay'a gönderir
          */
         sendToApproval(): void {
+            // let approvalReq = {"record_id":25754,"module_id":34};
             request.post(ApiEndPoints.SendToApproval, this.opts, ((err: Error, resp, body: ITimeTrackerCreateResponse) => {
                 if (err) return err.message;
                 if (body.hasOwnProperty('created_at')) {
