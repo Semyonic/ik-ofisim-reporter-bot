@@ -121,19 +121,17 @@ export module TimeSheetReporterBot {
         };
         public owner: number;
         public trackerId: number;
-        public hoursLeft: number;
         public currentMonth: string;
         public currentRange: string;
-        public completedHours: string;
+        public completedHours: number;
         public approved: boolean = false;
         public completed: boolean = false;
         public isInitialized: boolean = false;
-        public hasCurrentRecord: boolean = false;
         public latestData: ITimeTrackerListResponse[];
         public debugDateData: ITimeTrackerListResponse;
 
         constructor() {
-            this.init().then();
+            this.init();
         }
 
         async init() {
@@ -166,7 +164,11 @@ export module TimeSheetReporterBot {
                         if (err) {
                             reject(err.message);
                         }
-                        this.latestData = body.reverse();
+                        if (body.length < 1) {
+                            this.createItem();
+                        } else {
+                            this.latestData = body.reverse();
+                        }
                     }));
             });
         }
@@ -212,7 +214,7 @@ export module TimeSheetReporterBot {
                                 }
                                 this.trackerId = x.timetracker_id;
                                 this.completed = x.tamamlandi;
-                                this.completedHours = x.tamamlanan_saat;
+                                this.completedHours = Number(x.tamamlanan_saat.split('/').values().next(0).value);
                                 this.currentRange = x.date_range;
                                 this.currentMonth = x.ilgili_ay;
                                 this.debugDateData = x;
@@ -227,9 +229,9 @@ export module TimeSheetReporterBot {
         /**
          * Girişi yapılmış çizelgeleri onay'a gönderir
          */
-        sendToApproval(): void {
+        async sendToApproval() {
             // let approvalReq = {"record_id":25754,"module_id":34};
-            request.post(ApiEndPoints.SendToApproval, this.opts, ((err: Error, resp, body: ITimeTrackerCreateResponse) => {
+            await request.post(ApiEndPoints.SendToApproval, this.opts, ((err: Error, resp, body: ITimeTrackerCreateResponse) => {
                 if (err) return err.message;
                 if (body.hasOwnProperty('created_at')) {
                     console.info('OK')
@@ -281,34 +283,22 @@ export module TimeSheetReporterBot {
             console.warn('Server started at', server.address()['port']);
         }
 
-        private check() {
-            if (new Date(this.bot.latestData.slice(-1)[0].created_at).getDay() !== new Date(moment().format("YYYY-MM-DD[T]HH:mm:ss")).getDay()) {
-                this.bot.createItem().then();
-            }
-            if (new Date().getDay() === WeekEnds.Friday && this.bot.hoursLeft === 0) {
-                this.bot.sendToApproval();
-            } else {
-                console.warn('Cannot send approval request. Week not completed yet !');
-            }
-        }
-
         private startBot(): string {
             if (this.instance === undefined) {
                 this.instance = setInterval(() => {
-                    if (!Object.values(WeekEnds).includes(new Date().getDay())) {
-                        if (!this.bot.isInitialized) {
-                            this.bot.getProps().then(() => {
-                                this.check();
-                            }).catch((err) => {
-                                console.error(err);
-                            }).catch((err) => {
-                                console.error(err)
-                            });
+                    dotnev.config();
+                    if (this.bot.latestData !== undefined) {
+                        if (new Date(this.bot.latestData.slice(-1)[0].created_at).getDay() !== new Date(moment().format("YYYY-MM-DD[T]HH:mm:ss")).getDay()) {
+                            this.bot.createItem().then(this.bot.getProps)
+                        }
+                        if (new Date().getDay() === WeekEnds.Friday && this.bot.completedHours === 45) {
+                            this.bot.sendToApproval().finally(this.bot.getProps);
                         } else {
-                            this.check();
+                            console.warn('Cannot send approval request. Week not completed yet !');
                         }
                     }
                 }, Number(REPORT_CHECK_INTERVAL));
+                console.info('Bot Started ...');
                 return 'Started ...';
             } else {
                 return 'Cannot start. An instance already running';
@@ -321,7 +311,6 @@ export module TimeSheetReporterBot {
                     return this.instance !== undefined;
                 })(),
                 date: this.bot.debugDateData,
-                auth: this.tokenInfo,
                 reportId: this.bot.trackerId,
             };
         }
@@ -337,6 +326,7 @@ export module TimeSheetReporterBot {
 
         private commandHandler(): void {
             server.on('request', (request, response) => {
+                response.setHeader('Content-Type', 'application/json');
                 if (request.method === 'GET') {
                     switch (request.url) {
                         case ROUTES.root:
