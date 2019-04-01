@@ -1,6 +1,6 @@
 # ofisim-ik-reporter-bot
 [![Build Status](https://travis-ci.com/Semyonic/ik-ofisim-reporter-bot.svg?branch=master)](https://travis-ci.com/Semyonic/ik-ofisim-reporter-bot)
-![Docker Cloud Build Status](https://img.shields.io/docker/cloud/build/semyonic/ik-ofisim-bot.svg)
+[![Docker Cloud Build Status](https://img.shields.io/docker/cloud/build/semyonic/ik-ofisim-bot.svg)](https://hub.docker.com/r/semyonic/ik-ofisim-bot)
 
 My solution to Etiya's daily routine.
 

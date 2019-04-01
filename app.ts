@@ -5,7 +5,6 @@ import moment = require('moment');
 const server = http.createServer().listen(3000);
 import request = require('request');
 
-
 export module TimeSheetReporterBot {
 
     dotnev.config();
@@ -129,15 +128,25 @@ export module TimeSheetReporterBot {
         public isInitialized: boolean = false;
         public latestData: ITimeTrackerListResponse[];
         public debugDateData: ITimeTrackerListResponse;
+        private _errorData: {
+            message: string,
+            date: string
+        };
 
         constructor() {
             this.init();
+        }
+
+        set errorData(value: { message: string; date: any }) {
+            this._errorData = value;
         }
 
         async init() {
             await this.getProps().then(() => {
                 this.getSome().then();
             }).catch((err) => {
+                this.errorData.date = new Date();
+                this.errorData.message = err.message;
                 console.error(err);
             });
         }
@@ -162,6 +171,8 @@ export module TimeSheetReporterBot {
                 request.post(ApiEndPoints.GetCreatedTrackers, this.opts,
                     ((err: Error, resp, body: ITimeTrackerListResponse[]) => {
                         if (err) {
+                            this.errorData.date = new Date();
+                            this.errorData.message = err.message;
                             reject(err.message);
                         }
                         if (body.length < 1) {
@@ -206,6 +217,8 @@ export module TimeSheetReporterBot {
                 request.post(ApiEndPoints.GetTrackers, this.opts, (
                     (err: Error, resp, body: ITimeTrackerListResponse[] | any) => {
                         if (err || body.hasOwnProperty('message')) {
+                            this.errorData.date = new Date();
+                            this.errorData.message = err.message;
                             reject({clientErr: err, respErr: body.message, detail: this.opts});
                         } else {
                             body.map((x: ITimeTrackerListResponse) => {
@@ -230,9 +243,12 @@ export module TimeSheetReporterBot {
          * Girişi yapılmış çizelgeleri onay'a gönderir
          */
         async sendToApproval() {
-            // let approvalReq = {"record_id":25754,"module_id":34};
             await request.post(ApiEndPoints.SendToApproval, this.opts, ((err: Error, resp, body: ITimeTrackerCreateResponse) => {
-                if (err) return err.message;
+                if (err) {
+                    this.errorData.date = new Date();
+                    this.errorData.message = err.message;
+                    return err.message;
+                }
                 if (body.hasOwnProperty('created_at')) {
                     console.info('OK')
                 }
@@ -260,6 +276,8 @@ export module TimeSheetReporterBot {
             };
             await request.post(ApiEndPoints.CreateTracker, this.opts, ((err: Error, resp, body: ITimeTrackerCreateResponse) => {
                 if (err) {
+                    this.errorData.date = new Date();
+                    this.errorData.message = err.message;
                     return err.message;
                 }
                 if (body.id) {
@@ -310,6 +328,7 @@ export module TimeSheetReporterBot {
                 running: (() => {
                     return this.instance !== undefined;
                 })(),
+                errors: this.bot.errorData,
                 date: this.bot.debugDateData,
                 reportId: this.bot.trackerId,
             };
